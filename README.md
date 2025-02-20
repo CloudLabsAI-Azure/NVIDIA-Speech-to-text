@@ -111,6 +111,122 @@ python app.py
    http://127.0.0.1:5000
    ```
 
+## Azure VM and NGINX Configuration
+
+### Prerequisites
+- Azure VM with Docker installed
+- NGINX installed
+- Domain name (optional)
+- SSL certificate (optional)
+
+### Configuration Steps
+
+1. Create a Docker network:
+```bash
+docker network create app-network
+```
+
+2. Run the Riva container with network configuration:
+```bash
+docker run -d \
+   --name=riva-speech \
+   --runtime=nvidia \
+   --gpus '"device=0"' \
+   --network app-network \
+   --shm-size=8GB \
+   -e NGC_API_KEY \
+   -e NIM_MANIFEST_PROFILE \
+   -e NIM_HTTP_API_PORT=9000 \
+   -e NIM_GRPC_API_PORT=50051 \
+   -p 9000:9000 \
+   -p 50051:50051 \
+   -e NIM_OPTIMIZE=True \
+   nvcr.io/nim/nvidia/riva-speech:latest
+```
+
+3. Configure NGINX:
+```bash
+sudo nano /etc/nginx/sites-available/riva-app
+```
+
+Add the following configuration:
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;  # Or your VM's public IP
+
+    # HTTP API endpoint
+    location / {
+        proxy_pass http://localhost:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # gRPC endpoint
+    location /grpc {
+        grpc_pass grpc://localhost:50051;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+4. Enable the NGINX configuration:
+```bash
+sudo ln -s /etc/nginx/sites-available/riva-app /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+5. Configure Azure NSG rules:
+```bash
+az network nsg rule create \
+  --resource-group myResourceGroup \
+  --nsg-name myNSG \
+  --name allow-http \
+  --protocol tcp \
+  --priority 100 \
+  --destination-port-range 9000
+
+az network nsg rule create \
+  --resource-group myResourceGroup \
+  --nsg-name myNSG \
+  --name allow-grpc \
+  --protocol tcp \
+  --priority 110 \
+  --destination-port-range 50051
+```
+
+### SSL Configuration (Optional)
+
+1. Install Certbot:
+```bash
+sudo apt install certbot python3-certbot-nginx
+```
+
+2. Obtain SSL certificate:
+```bash
+sudo certbot --nginx -d your-domain.com
+```
+
+### Troubleshooting Azure Deployment
+
+- Check NGINX status: `sudo systemctl status nginx`
+- View NGINX logs: `sudo tail -f /var/log/nginx/error.log`
+- Check Docker container logs: `docker logs riva-speech`
+- Verify network rules: `az network nsg rule list --resource-group myResourceGroup --nsg-name myNSG`
+
+### Security Best Practices
+
+- Always use HTTPS in production environments
+- Implement rate limiting in NGINX
+- Keep Docker and NGINX updated
+- Use strong firewall rules
+- Consider using Azure Application Gateway for additional security
+
 ## Usage
 
 1. **Microphone Recording**:
