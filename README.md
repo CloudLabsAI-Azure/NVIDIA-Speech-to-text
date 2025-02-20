@@ -141,7 +141,7 @@ docker run -d \
    -p 9000:9000 \
    -p 50051:50051 \
    -e NIM_OPTIMIZE=True \
-   nvcr.io/nim/nvidia/riva-speech:latest
+   nvcr.io/nim/nvidia/riva-asr:1.3.0
 ```
 
 3. Configure NGINX:
