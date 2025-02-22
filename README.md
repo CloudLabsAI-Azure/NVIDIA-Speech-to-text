@@ -99,18 +99,6 @@ pip install -r requirements.txt
 python app.py
 ```
 
-## Running the Application
-
-1. Ensure the NVIDIA Riva ASR container is running
-2. Start the Flask application:
-   ```bash
-   python app.py
-   ```
-3. Open your web browser and navigate to:
-   ```
-   http://127.0.0.1:5000
-   ```
-
 ## Azure VM and NGINX Configuration
 
 ### Prerequisites
@@ -125,25 +113,6 @@ python app.py
 ```bash
 docker network create app-network
 ```
-
-2. Run the Riva container with network configuration:
-```bash
-docker run -d \
-   --name=riva-speech \
-   --runtime=nvidia \
-   --gpus '"device=0"' \
-   --network app-network \
-   --shm-size=8GB \
-   -e NGC_API_KEY \
-   -e NIM_MANIFEST_PROFILE \
-   -e NIM_HTTP_API_PORT=9000 \
-   -e NIM_GRPC_API_PORT=50051 \
-   -p 9000:9000 \
-   -p 50051:50051 \
-   -e NIM_OPTIMIZE=True \
-   nvcr.io/nim/nvidia/riva-asr:1.3.0
-```
-
 3. Configure NGINX:
 ```bash
 sudo nano /etc/nginx/sites-available/riva-app
