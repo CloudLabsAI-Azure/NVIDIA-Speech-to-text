@@ -131,15 +131,15 @@ async function startRecording() {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
                 channelCount: 1,
-                sampleRate: 44100,
+                sampleRate: 44100,  // Use standard sample rate
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true
             } 
         });
         
         mediaRecorder = new MediaRecorder(stream, {
-            audioBitsPerSecond: 128000
+            mimeType: 'audio/webm;codecs=opus',  // Use opus codec for better quality
+            bitsPerSecond: 128000
         });
         audioChunks = [];
 
@@ -149,15 +149,21 @@ async function startRecording() {
 
         mediaRecorder.onstop = () => {
             const recordedBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            currentAudioBlob = recordedBlob;
-            inputMode = 'mic';
+            // Convert to 16-bit PCM WAV
+            convertToWAV(recordedBlob).then(wavBlob => {
+                currentAudioBlob = wavBlob;
+                inputMode = 'mic';
+                
+                // Update UI
+                addMessage(wavBlob, true);
+                sendButton.disabled = false;
+                
+                const duration = Math.round((Date.now() - recordingStartTime) / 1000);
+                setStatus(`Recording stopped (${duration}s)`, 'info');
+            });
             
-            // Update UI
-            addMessage(recordedBlob, true);
-            sendButton.disabled = false;
-            
-            const duration = Math.round((Date.now() - recordingStartTime) / 1000);
-            setStatus(`Recording stopped (${duration}s)`, 'info');
+            // Stop all tracks to release the microphone
+            stream.getTracks().forEach(track => track.stop());
         };
 
         mediaRecorder.start();
@@ -174,6 +180,80 @@ async function startRecording() {
     }
 }
 
+// Add WAV conversion function
+function convertToWAV(audioBlob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async function() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            try {
+                const audioBuffer = await audioContext.decodeAudioData(reader.result);
+                const offlineCtx = new OfflineAudioContext(1, audioBuffer.duration * 16000, 16000);
+                
+                // Create source buffer
+                const source = offlineCtx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(offlineCtx.destination);
+                source.start();
+
+                // Render audio
+                const renderedBuffer = await offlineCtx.startRendering();
+                const wavData = audioBufferToWav(renderedBuffer);
+                const wavBlob = new Blob([wavData], { type: 'audio/wav' });
+                resolve(wavBlob);
+            } catch (err) {
+                reject(err);
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(audioBlob);
+    });
+}
+
+// Add WAV format conversion helper
+function audioBufferToWav(audioBuffer) {
+    const numChannels = 1;
+    const sampleRate = 16000;
+    const format = 1; // PCM
+    const bitsPerSample = 16;
+    
+    const dataLength = audioBuffer.length * numChannels * (bitsPerSample / 8);
+    const buffer = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(buffer);
+    
+    // Write WAV header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
+    view.setUint16(32, numChannels * (bitsPerSample / 8), true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataLength, true);
+    
+    // Write audio data
+    const channelData = audioBuffer.getChannelData(0);
+    let offset = 44;
+    for (let i = 0; i < channelData.length; i++) {
+        const sample = Math.max(-1, Math.min(1, channelData[i]));
+        view.setInt16(offset, sample * 0x7FFF, true);
+        offset += 2;
+    }
+    
+    return buffer;
+}
+
+function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+    }
+}
+
 // Update recording timer
 function updateRecordingTimer() {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -185,9 +265,8 @@ function updateRecordingTimer() {
 
 // Stop recording
 function stopRecording() {
-    if (mediaRecorder) {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
-        mediaRecorder.stream.getTracks().forEach(track => track.stop());
         recordButton.classList.remove('recording');
         recordButton.querySelector('i').className = 'fas fa-microphone';
         recordingStatus.textContent = '';

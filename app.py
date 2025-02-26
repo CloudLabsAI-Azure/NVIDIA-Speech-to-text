@@ -7,15 +7,59 @@ import json
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from azure_ai import process_with_azure_ai
+from flask_cors import CORS
+import sounddevice as sd
+import numpy as np
+import wave
+import io
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__, static_folder='static')
+CORS(app)  # Enable CORS for all routes
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def get_audio_devices():
+    try:
+        devices = sd.query_devices()
+        input_devices = [d for d in devices if d['max_input_channels'] > 0]
+        return input_devices
+    except Exception as e:
+        return str(e)
+
+@app.route('/api/check-mic')
+def check_microphone():
+    try:
+        devices = get_audio_devices()
+        if devices:
+            return jsonify({"status": "success", "devices": devices})
+        return jsonify({"status": "error", "message": "No input devices found"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/record', methods=['POST'])
+def record_audio():
+    try:
+        duration = request.json.get('duration', 5)  # Default 5 seconds
+        fs = 44100  # Sample rate
+        recording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
+        sd.wait()
+        
+        # Convert to WAV format
+        byte_io = io.BytesIO()
+        with wave.open(byte_io, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(fs)
+            wf.writeframes((recording * 32767).astype(np.int16).tobytes())
+        
+        return jsonify({"status": "success", "message": "Recording completed"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/')
 def index():
@@ -44,11 +88,14 @@ def transcribe():
 
     try:
         # Get server and language code from environment variables
-        riva_server = os.getenv('RIVA_SERVER', '4.155.11.186:50051')
+        riva_server = os.getenv('RIVA_SERVER')
+        if not riva_server:
+            return jsonify({'error': 'RIVA_SERVER not configured in .env file'}), 500
+            
         language_code = os.getenv('LANGUAGE_CODE', 'en-US')
 
-        # Run the transcription script
-        script_path = r"asr\transcribe_file.py"
+        # Run the transcription script with explicit encoding parameters
+        script_path = r"asr/transcribe_file.py"
         cmd = [
             'python',
             script_path,
@@ -86,11 +133,22 @@ def transcribe_mic():
 
     try:
         # Get server and language code from environment variables
-        riva_server = os.getenv('RIVA_SERVER', '4.155.11.186:50051')
+        riva_server = os.getenv('RIVA_SERVER')
+        if not riva_server:
+            return jsonify({'error': 'RIVA_SERVER not configured in .env file'}), 500
+            
         language_code = os.getenv('LANGUAGE_CODE', 'en-US')
         
-        # Run the transcription script for recorded audio files
-        script_path = r"asr\transcribe_file.py"
+        # Get encoding configuration from request
+        encoding_config = {}
+        if request.form.get('encoding_config'):
+            try:
+                encoding_config = json.loads(request.form.get('encoding_config'))
+            except json.JSONDecodeError:
+                return jsonify({'error': 'Invalid encoding configuration format'}), 400
+        
+        # Run the transcription script with explicit encoding parameters
+        script_path = r"asr/transcribe_file.py"
         cmd = [
             'python',
             script_path,
@@ -99,10 +157,24 @@ def transcribe_mic():
             '--input-file', filepath
         ]
         
+        # Add additional supported flags if specified in encoding_config
+        if encoding_config.get('word_time_offsets', False):
+            cmd.append('--word-time-offsets')
+            
+        if 'max_alternatives' in encoding_config:
+            cmd.extend(['--max-alternatives', str(encoding_config['max_alternatives'])])
+            
+        if encoding_config.get('profanity_filter', False):
+            cmd.append('--profanity-filter')
+        
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 0:
-            return jsonify({'transcription': result.stdout.strip(), 'source': 'mic'})
+            return jsonify({
+                'transcription': result.stdout.strip(), 
+                'source': 'mic',
+                'encoding_config': encoding_config
+            })
         else:
             return jsonify({'error': result.stderr.strip()}), 500
             
@@ -142,7 +214,7 @@ if __name__ == '__main__':
             print("openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365")
     
         app.run(
-            host='127.0.0.1',
+            host='0.0.0.0',
             port=port, 
             debug=True,
             ssl_context=ssl_context
@@ -150,4 +222,4 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Error starting server: {e}")
         print("Falling back to HTTP mode")
-        app.run(host='127.0.0.1', port=port, debug=True)
+        app.run(host='0.0.0.0', port=port, debug=True)
