@@ -1,452 +1,353 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Audio Chat Bot</title>
-    <!-- Add Font Awesome for icons -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Speech Assistant</title>
+    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --panel-bg: #252526;
+            --text-color: #d4d4d4;
+            --accent-color: #0078d4;
+            --border-color: #3e3e42;
+            --input-bg: #333333;
+            --hover-color: #2a2d2e;
+            --user-msg-color: #2b5278;
+            --bot-msg-color: #37373d;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .app-container {
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            padding: 20px 20px 160px 20px; /* Increase bottom padding to make room for fixed controls */
         }
-        .container {
-            border: 1px solid #ccc;
-            padding: 20px;
-            border-radius: 5px;
+
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 15px;
         }
-        #result {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #eee;
-            min-height: 100px;
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 400;
+            margin-left: 10px;
         }
-        .loading {
-            display: none;
-            color: #666;
+
+        .header-logo {
+            width: 30px;
+            height: 30px;
+            object-fit: contain;
         }
-        .tab-container {
-            margin-bottom: 20px;
-        }
-        .tab-button {
-            padding: 10px 20px;
-            margin-right: 10px;
-            cursor: pointer;
-            background: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .tab-button.active {
-            background: #007bff;
-            color: white;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .record-button {
-            background: #dc3545;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .record-button.recording {
-            background: #28a745;
-        }
+
         .chat-container {
-            height: calc(100vh - 200px);
-            margin-bottom: 80px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            flex: 1;
             overflow-y: auto;
-            padding: 10px;
+            padding: 15px;
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            scroll-behavior: smooth;
+            margin-bottom: 15px;
+            max-height: calc(100vh - 250px); /* Adjust depending on your header and footer height */
         }
+
+        .message-row {
+            display: flex;
+            margin-bottom: 15px;
+        }
+
         .message {
-            margin: 10px;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+            white-space: pre-wrap;    /* Preserve whitespace and line breaks */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+        
+        /* Add styling for code blocks within messages */
+        .message pre {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 5px 0;
+        }
+
         .user-message {
-            background-color: #007bff;
-            color: white;
+            background-color: var(--user-msg-color);
             margin-left: auto;
+            border-bottom-right-radius: 2px;
         }
+
         .bot-message {
-            background-color: #f0f0f0;
-            margin-right: auto;
+            background-color: var(--bot-msg-color);
+            border-bottom-left-radius: 2px;
         }
-        .input-container {
+
+        .message-actions {
             display: flex;
             gap: 10px;
-            align-items: center;
-            margin-top: 10px;
+            margin-top: 5px;
+            justify-content: flex-end;
         }
-        .control-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .input-controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            background: white;
-            padding: 15px 25px;
-            border-radius: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            max-width: 600px;
-            width: 90%;
-        }
-        .icon-button {
-            font-size: 24px;
-            color: #007bff;
+
+        .action-button {
             background: none;
             border: none;
+            color: var(--text-color);
+            opacity: 0.6;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .action-button:hover {
+            opacity: 1;
+        }
+
+        .input-area {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--bg-color);
+            padding: 15px 20px;
+            z-index: 100;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .input-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            padding: 15px;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        #userInput {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            font-size: 1rem;
+            resize: none;
+            height: 60px;
+            margin-right: 10px;
+        }
+
+        #userInput:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .button-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .icon-button {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.2rem;
             cursor: pointer;
             padding: 10px;
             border-radius: 50%;
-            transition: all 0.3s;
-        }
-        .icon-button:hover {
-            background: #f0f0f0;
-        }
-        .icon-button.recording {
-            color: #dc3545;
-            animation: pulse 1.5s infinite;
-        }
-        .audio-message {
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
         }
-        .audio-message audio {
-            max-width: 200px;
+
+        .icon-button:hover {
+            background-color: var(--hover-color);
         }
+
+        .icon-button.active {
+            color: var(--accent-color);
+        }
+
+        .icon-button.record.recording {
+            color: #e74c3c;
+            animation: pulse 1.5s infinite;
+        }
+
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
+
+        .send-button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 15px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .send-button:hover {
+            background-color: #006ec9;
+        }
+
+        .send-button:disabled {
+            background-color: #2c5d7e;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .status-bar {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 5px 15px;
+            font-size: 0.8rem;
+            opacity: 0.7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         #fileInput {
             display: none;
         }
-        .send-button {
-            color: #28a745;
-            font-size: 24px;
+
+        .typing-indicator {
             display: none;
+            padding: 10px 15px;
+            background-color: var(--bot-msg-color);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            width: fit-content;
+            border-bottom-left-radius: 2px;
         }
-        .send-button.active {
-            display: inline-block;
+
+        .typing-animation {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--text-color);
+            border-radius: 50%;
+            animation: wave 1.3s linear infinite;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: -1.1s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: -0.9s;
+        }
+
+        @keyframes wave {
+            0%, 60%, 100% { transform: initial; }
+            30% { transform: translateY(-5px); }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 10px;
+            }
+            .message {
+                max-width: 95%;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Audio Chat Bot</h2>
-        
-        <div class="chat-container" id="chatContainer"></div>
-        
-        <div class="input-controls">
-            <button id="recordButton" class="icon-button">
-                <i class="fas fa-microphone"></i>
-            </button>
-            <input type="file" id="fileInput" accept="audio/*">
-            <button onclick="document.getElementById('fileInput').click()" class="icon-button">
-                <i class="fas fa-paperclip"></i>
-            </button>
-            <button id="sendRecordingButton" class="icon-button send-button">
-                <i class="fas fa-paper-plane"></i>
-            </button>
+    <div class="app-container">
+        <div class="header">
+            <svg class="header-logo" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#0078d4" d="M26 2h-4v4h4V2zm-8 4h-4v4h4V6zm-8 4H6v4h4v-4zm16 0h-4v4h4v-10zm-8 4h-4v4h4v-8zm-8 4H6v4h4v-8zm16 0h-4v4h4v-8zm-8 4h-4v12h4V18zm-8 4H6v8h4v-12zm16 0h-4v8h4v-12z"/>
+            </svg>
+            <h1>AI Speech Assistant</h1>
         </div>
 
-        <div id="loading" class="loading">Processing... Please wait.</div>
+        <div class="chat-container" id="chatContainer">
+            <div class="message-row"></div>
+                <div class="message bot-message">
+                    Hello! I'm your AI assistant. You can send me text messages, record audio, or upload audio files. How can I help you today?
+                </div>
+            </div>
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-animation">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script>
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let recordedBlob = null;
-        let chatHistory = [];
-        let recordingStartTime = null;
+    <div class="input-area">
+        <div class="input-container">
+            <textarea 
+                id="userInput" 
+                placeholder="Type your message or use the microphone to record..."
+                rows="2"
+            ></textarea>
+            <div class="button-container">
+                <button id="recordButton" class="icon-button record" title="Record audio">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <input type="file" id="fileInput" accept="audio/*">
+                <button id="fileButton" class="icon-button" title="Upload audio file" onclick="document.getElementById('fileInput').click()"></button>
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <button id="sendButton" class="send-button" disabled>
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
+        </div>
 
-        function generateFileName() {
-            return 'audio_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '.wav';
-        }
+        <div class="status-bar">
+            <span id="statusMessage">Ready</span>
+            <span id="recordingStatus"></span>
+        </div>
+    </div>
 
-        function addAudioMessage(blob, isUser) {
-            const chatContainer = document.getElementById('chatContainer');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'} audio-message`;
-            
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = URL.createObjectURL(blob);
-            
-            messageDiv.appendChild(audio);
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            // Save to chat history with audio blob
-            const fileName = generateFileName();
-            localStorage.setItem(fileName, blob);
-            
-            chatHistory.push({
-                type: 'audio',
-                fileName: fileName,
-                isUser: isUser,
-                timestamp: new Date().toISOString()
-            });
-            sessionStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-        }
-
-        function addMessage(message, isUser) {
-            const chatContainer = document.getElementById('chatContainer');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            messageDiv.textContent = message;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            
-            chatHistory.push({
-                type: 'text',
-                message: message,
-                isUser: isUser,
-                timestamp: new Date().toISOString()
-            });
-            sessionStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-        }
-
-        const sendButton = document.getElementById('sendRecordingButton');
-        let currentAudioBlob = null;
-
-        document.getElementById('recordButton').addEventListener('click', async function() {
-            const button = this;
-            const icon = button.querySelector('i');
-
-            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            channelCount: 1,
-                            sampleRate: 44100,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true
-                        }
-                    });
-                    
-                    mediaRecorder = new MediaRecorder(stream, {
-                        audioBitsPerSecond: 128000
-                    });
-                    audioChunks = [];
-
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        recordedBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        currentAudioBlob = recordedBlob;
-                        const audio = document.createElement('audio');
-                        audio.controls = true;
-                        audio.src = URL.createObjectURL(recordedBlob);
-                        
-                        // Show send button
-                        sendButton.classList.add('active');
-                    };
-
-                    mediaRecorder.start();
-                    recordingStartTime = Date.now();
-                    button.classList.add('recording');
-                    icon.className = 'fas fa-stop';
-                } catch (err) {
-                    alert('Error accessing microphone: ' + err.message);
-                }
-            } else {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                button.classList.remove('recording');
-                icon.className = 'fas fa-microphone';
-            }
-        });
-
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            if (this.files.length > 0) {
-                const file = this.files[0];
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    currentAudioBlob = new Blob([e.target.result], { type: file.type });
-                    // Show send button
-                    sendButton.classList.add('active');
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        });
-
-        sendButton.addEventListener('click', function() {
-            if (!currentAudioBlob) {
-                alert('No audio to send');
-                return;
-            }
-
-            // Add audio message to chat
-            addAudioMessage(currentAudioBlob, true);
-
-            // Determine if it's a recording or file upload
-            if (recordedBlob === currentAudioBlob) {
-                sendRecording();
-            } else {
-                processFile();
-            }
-
-            // Reset and hide send button
-            currentAudioBlob = null;
-            sendButton.classList.remove('active');
-        });
-
-        window.onload = async function() {
-            const savedHistory = sessionStorage.getItem('chatHistory');
-            if (savedHistory) {
-                chatHistory = JSON.parse(savedHistory);
-                for (const item of chatHistory) {
-                    if (item.type === 'audio') {
-                        const blob = localStorage.getItem(item.fileName);
-                        if (blob) {
-                            addAudioMessage(blob, item.isUser);
-                        }
-                    } else {
-                        addMessage(item.message, item.isUser);
-                    }
-                }
-            }
-        };
-
-        function sendRecording() {
-            if (!currentAudioBlob) {
-                alert('No recording available');
-                return;
-            }
-
-            addMessage('Sent voice recording', true);
-            document.getElementById('loading').style.display = 'block';
-
-            const audioContext = new AudioContext();
-            const fileReader = new FileReader();
-
-            fileReader.onload = async function() {
-                const audioBuffer = await audioContext.decodeAudioData(this.result);
-                const wavBuffer = audioBufferToWav(audioBuffer);
-                const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
-
-                const formData = new FormData();
-                formData.append('file', wavBlob, 'recording.wav');
-
-                fetch('/transcribe_mic', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('loading').style.display = 'none';
-                    if (data.error) {
-                        addMessage(`Error: ${data.error}`, false);
-                    } else {
-                        addMessage(data.transcription, false);
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('loading').style.display = 'none';
-                    addMessage(`Error: ${error.message}`, false);
-                });
-            };
-
-            fileReader.readAsArrayBuffer(currentAudioBlob);
-        }
-
-        function audioBufferToWav(buffer) {
-            const numberOfChannels = 1;
-            const sampleRate = 44100;  // Changed from 16000 to 44100
-            const format = 1; // PCM
-            const bitsPerSample = 16;
-            const blockAlign = numberOfChannels * bitsPerSample / 8;
-            const byteRate = sampleRate * blockAlign;
-            const dataSize = buffer.length * blockAlign;
-            const headerSize = 44;
-            const wav = new ArrayBuffer(headerSize + dataSize);
-            const view = new DataView(wav);
-
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + dataSize, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, format, true);
-            view.setUint16(22, numberOfChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitsPerSample, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, dataSize, true);
-
-            const data = new Float32Array(buffer.getChannelData(0));
-            let offset = headerSize;
-            for (let i = 0; i < data.length; i++) {
-                const sample = Math.max(-1, Math.min(1, data[i]));
-                view.setInt16(offset, sample * 0x7FFF, true);
-                offset += 2;
-            }
-
-            return wav;
-        }
-
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        }
-
-        function processFile() {
-            if (!currentAudioBlob) {
-                alert('No file selected');
-                return;
-            }
-
-            addMessage('Sent audio file', true);
-            document.getElementById('loading').style.display = 'block';
-
-            const formData = new FormData();
-            formData.append('file', currentAudioBlob, 'audio_file.wav');
-
-            fetch('/transcribe', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('loading').style.display = 'none';
-                if (data.error) {
-                    addMessage(`Error: ${data.error}`, false);
-                } else {
-                    addMessage(data.transcription, false);
-                }
-            })
-            .catch(error => {
-                document.getElementById('loading').style.display = 'none';
-                addMessage(`Error: ${error.message}`, false);
-                console.error('Error:', error);
-            });
-        }
-    </script>
+    <script src="/static/chat.js"></script>
 </body>
 </html>
