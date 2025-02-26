@@ -329,16 +329,19 @@
                 rows="2"
             ></textarea>
             <div class="button-container">
-                <button id="recordButton" class="icon-button record" title="Record audio">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <input type="file" id="fileInput" accept="audio/*">
-                <button id="fileButton" class="icon-button" title="Upload audio file" onclick="document.getElementById('fileInput').click()"></button>
-                    <i class="fas fa-paperclip"></i>
-                </button>
-                <button id="sendButton" class="send-button" disabled>
-                    <i class="fas fa-paper-plane"></i> Send
-                </button>
+                <div class="button-container">
+                    <button id="recordButton" class="icon-button record" title="Record audio">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <input type="file" id="fileInput" accept="audio/*">
+                    <!-- Fixed the paperclip button structure -->
+                    <button id="fileButton" class="icon-button" title="Upload audio file" onclick="document.getElementById('fileInput').click()">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                    <button id="sendButton" class="send-button" disabled>
+                        <i class="fas fa-paper-plane"></i> Send
+                    </button>
+                </div>
             </div>
         </div>
 
