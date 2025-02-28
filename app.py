@@ -223,3 +223,62 @@ if __name__ == '__main__':
         print(f"Error starting server: {e}")
         print("Falling back to HTTP mode")
         app.run(host='127.0.0.1', port=port, debug=True)
+
+def chat_ui():
+    with gr.Column():
+        with gr.Row():
+            with gr.Column(scale=0.85):
+                chatbot = gr.Chatbot(
+                    [],
+                    elem_id="chatbot",
+                    avatar_images=(None, "NVIDIA-logo.png"),
+                    height=650,
+                    show_copy_button=True,
+                    show_share_button=True,
+                )
+                with gr.Row():
+                    with gr.Column(scale=0.15):
+                        upload_btn = gr.UploadButton("📁", file_types=["audio"])
+                    with gr.Column(scale=0.85):
+                        msg = gr.Textbox(
+                            show_label=False,
+                            placeholder="Send a message",
+                            container=False,
+                        )
+                with gr.Row():
+                    audio_preview = gr.Audio(label="Audio Preview", visible=False)
+                    loading_indicator = gr.HTML(
+                        "<div class='loading-indicator' style='display:none;'><p>Processing your request...</p><div class='spinner'></div></div>",
+                        elem_id="loading-indicator"
+                    )
+
+    def upload_file(file):
+        file_path = file.name
+        return {
+            msg: f"I've uploaded an audio file: {os.path.basename(file_path)}",
+            audio_preview: file.name
+        }
+
+    upload_btn.upload(
+        upload_file,
+        inputs=[upload_btn],
+        outputs=[msg, audio_preview],
+    )
+
+    def update_chat(message, history):
+        loading_indicator.update(visible=True)
+        # ...existing code...
+        loading_indicator.update(visible=False)
+        return history, ""
+
+    msg.submit(
+        update_chat,
+        inputs=[msg, chatbot],
+        outputs=[chatbot, msg],
+        js="""
+        function() {
+            document.querySelector('#loading-indicator .loading-indicator').style.display = 'flex';
+            return [];
+        }
+        """
+    )
