@@ -5,6 +5,7 @@ let audioChunks = [];
 let currentAudioBlob = null;
 let recordingStartTime = null;
 let inputMode = 'text'; // 'text', 'mic', or 'file'
+let rawDataResponses = {}; // Store raw data for responses
 
 // DOM elements
 const chatContainer = document.getElementById('chatContainer');
@@ -15,6 +16,80 @@ const sendButton = document.getElementById('sendButton');
 const statusMessage = document.getElementById('statusMessage');
 const recordingStatus = document.getElementById('recordingStatus');
 const typingIndicator = document.getElementById('typingIndicator');
+
+// Theme switcher elements
+const lightThemeBtn = document.getElementById('lightTheme');
+const darkThemeBtn = document.getElementById('darkTheme');
+const systemThemeBtn = document.getElementById('systemTheme');
+
+// Theme functionality
+function setTheme(theme) {
+    // Remove any existing theme
+    document.body.removeAttribute('data-theme');
+    
+    if (theme === 'dark') {
+        document.body.setAttribute('data-theme', 'dark');
+    } else if (theme === 'light') {
+        // Light theme is the default, so we don't need to set an attribute
+    }
+    
+    // Save the selected theme to localStorage
+    if (theme === 'system') {
+        localStorage.removeItem('theme'); // Use system default
+    } else {
+        localStorage.setItem('theme', theme);
+    }
+    
+    updateActiveThemeButton(theme);
+}
+
+function updateActiveThemeButton(theme) {
+    // Remove active class from all buttons
+    lightThemeBtn.classList.remove('active');
+    darkThemeBtn.classList.remove('active');
+    systemThemeBtn.classList.remove('active');
+    
+    // Add active class to the selected button
+    if (theme === 'light') {
+        lightThemeBtn.classList.add('active');
+    } else if (theme === 'dark') {
+        darkThemeBtn.classList.add('active');
+    } else {
+        systemThemeBtn.classList.add('active');
+    }
+}
+
+function getSystemTheme() {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        setTheme(savedTheme);
+    } else {
+        // Use system preference
+        setTheme(getSystemTheme());
+        updateActiveThemeButton('system');
+    }
+}
+
+// Theme switcher event listeners
+lightThemeBtn.addEventListener('click', () => setTheme('light'));
+darkThemeBtn.addEventListener('click', () => setTheme('dark'));
+systemThemeBtn.addEventListener('click', () => setTheme('system'));
+
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (!localStorage.getItem('theme')) {
+        // Only update if using system theme
+        setTheme(getSystemTheme());
+        updateActiveThemeButton('system');
+    }
+});
+
+// Initialize theme
+applyTheme();
 
 // Enable send button when input changes
 userInput.addEventListener('input', () => {
@@ -67,12 +142,16 @@ userInput.addEventListener('keydown', function(e) {
 });
 
 // Function to add a message to the chat
-function addMessage(message, isUser, className = '') {
+function addMessage(message, isUser, className = '', rawData = null) {
     const messageRow = document.createElement('div');
     messageRow.className = 'message-row';
     
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'} ${className}`;
+    
+    // Generate a unique ID for this message
+    const messageId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    messageDiv.setAttribute('id', messageId);
     
     // Handle different message types
     if (message instanceof Blob) {
@@ -93,8 +172,54 @@ function addMessage(message, isUser, className = '') {
     }
     
     messageRow.appendChild(messageDiv);
+    
+    // Add raw data button for bot messages if we have raw data
+    if (!isUser && rawData) {
+        // Store the raw data
+        rawDataResponses[messageId] = rawData;
+        
+        // Create raw data toggle button
+        const rawDataBtn = document.createElement('button');
+        rawDataBtn.className = 'raw-data-button';
+        rawDataBtn.title = 'Show raw data';
+        rawDataBtn.innerHTML = '<i class="fas fa-lightbulb"></i>';
+        rawDataBtn.onclick = function() {
+            toggleRawData(messageId, rawDataBtn);
+        };
+        
+        messageRow.appendChild(rawDataBtn);
+        
+        // Create raw data container (initially hidden)
+        const rawDataContainer = document.createElement('div');
+        rawDataContainer.className = 'raw-data';
+        rawDataContainer.id = `raw-${messageId}`;
+        
+        try {
+            if (typeof rawData === 'string') {
+                rawDataContainer.textContent = rawData;
+            } else {
+                rawDataContainer.textContent = JSON.stringify(rawData, null, 2);
+            }
+        } catch (e) {
+            rawDataContainer.textContent = 'Error displaying raw data';
+        }
+        
+        messageRow.appendChild(rawDataContainer);
+    }
+    
     chatContainer.appendChild(messageRow);
     scrollToBottom();
+    
+    return messageId;
+}
+
+// Toggle raw data display
+function toggleRawData(messageId, button) {
+    const rawDataElement = document.getElementById(`raw-${messageId}`);
+    if (rawDataElement) {
+        rawDataElement.classList.toggle('show');
+        button.classList.toggle('active');
+    }
 }
 
 // Scroll chat to bottom
@@ -110,7 +235,7 @@ function setStatus(message, type = 'info') {
     } else if (type === 'success') {
         statusMessage.style.color = '#2ecc71';
     } else {
-        statusMessage.style.color = 'inherit';
+        statusMessage.style.color = 'var(--text-color)';
     }
 }
 
@@ -319,7 +444,7 @@ function sendTextMessage() {
                 resultText = data.result;
             }
             
-            addMessage(resultText, false);
+            addMessage(resultText, false, '', data);
             setStatus('Response received', 'success');
         }
     })
