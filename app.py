@@ -214,7 +214,7 @@ if __name__ == '__main__':
             print("openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365")
     
         app.run(
-            host='127.0.0.1',
+            host='0.0.0.0',
             port=port, 
             debug=True,
             ssl_context=ssl_context
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Error starting server: {e}")
         print("Falling back to HTTP mode")
-        app.run(host='127.0.0.1', port=port, debug=True)
+        app.run(host="0.0.0.0", port=5000, debug=True)
 
 def chat_ui():
     with gr.Column():
